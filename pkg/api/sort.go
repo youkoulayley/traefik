@@ -352,7 +352,6 @@ func sortByName[T orderedByName](direction string, results []T) {
 	// Ascending
 	if direction == ascendantSorting {
 		sort.Slice(results, func(i, j int) bool {
-			fmt.Println("name", results[i].name(), results[j].name())
 			return results[i].name() < results[j].name()
 		})
 
@@ -361,7 +360,6 @@ func sortByName[T orderedByName](direction string, results []T) {
 
 	// Descending
 	sort.Slice(results, func(i, j int) bool {
-		fmt.Println("name", results[i].name(), results[j].name())
 		return results[i].name() > results[j].name()
 	})
 }
@@ -370,7 +368,6 @@ func sortMeta[T orderedWithName, U constraints.Ordered](direction string, result
 	// Ascending
 	if direction == ascendantSorting {
 		sort.Slice(results, func(i, j int) bool {
-			fmt.Println("meta", fn(i), fn(j), results[i].name(), results[j].name())
 			if fn(i) == fn(j) {
 				return results[i].name() < results[j].name()
 			}
@@ -383,7 +380,6 @@ func sortMeta[T orderedWithName, U constraints.Ordered](direction string, result
 
 	// Descending
 	sort.Slice(results, func(i, j int) bool {
-		fmt.Println("meta", fn(i), fn(j), results[i].name(), results[j].name())
 		if fn(i) == fn(j) {
 			return results[i].name() > results[j].name()
 		}

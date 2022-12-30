@@ -800,10 +800,10 @@ func TestSortRouters(t *testing.T) {
 		t.Run(fmt.Sprintf("%s-%s", test.direction, test.sortBy), func(t *testing.T) {
 			t.Parallel()
 
-			url, err := url.Parse(fmt.Sprintf("/?direction=%s&sortBy=%s", test.direction, test.sortBy))
+			u, err := url.Parse(fmt.Sprintf("/?direction=%s&sortBy=%s", test.direction, test.sortBy))
 			require.NoError(t, err)
 
-			sortRouters(url.Query(), test.elements)
+			sortRouters(u.Query(), test.elements)
 
 			assert.Equal(t, test.expected, test.elements)
 		})
@@ -939,7 +939,7 @@ func TestSortServices(t *testing.T) {
 		},
 		{
 			direction: ascendantSorting,
-			sortBy:    "server",
+			sortBy:    "servers",
 			elements: []orderedService{
 				serviceRepresentation{
 					Name: "b",
@@ -988,7 +988,7 @@ func TestSortServices(t *testing.T) {
 					ServiceInfo: &runtime.ServiceInfo{
 						Service: &dynamic.Service{
 							LoadBalancer: &dynamic.ServersLoadBalancer{
-								Servers: make([]dynamic.Server, 2),
+								Servers: make([]dynamic.Server, 1),
 							},
 						},
 					},
@@ -998,7 +998,7 @@ func TestSortServices(t *testing.T) {
 					ServiceInfo: &runtime.ServiceInfo{
 						Service: &dynamic.Service{
 							LoadBalancer: &dynamic.ServersLoadBalancer{
-								Servers: make([]dynamic.Server, 2),
+								Servers: make([]dynamic.Server, 1),
 							},
 						},
 					},
@@ -1027,41 +1027,89 @@ func TestSortServices(t *testing.T) {
 		},
 		{
 			direction: descendantSorting,
-			sortBy:    "type",
+			sortBy:    "servers",
 			elements: []orderedService{
 				serviceRepresentation{
 					Name: "a",
-					Type: "a",
+					ServiceInfo: &runtime.ServiceInfo{
+						Service: &dynamic.Service{
+							LoadBalancer: &dynamic.ServersLoadBalancer{
+								Servers: make([]dynamic.Server, 1),
+							},
+						},
+					},
 				},
 				serviceRepresentation{
 					Name: "b",
-					Type: "a",
+					ServiceInfo: &runtime.ServiceInfo{
+						Service: &dynamic.Service{
+							LoadBalancer: &dynamic.ServersLoadBalancer{
+								Servers: make([]dynamic.Server, 1),
+							},
+						},
+					},
 				},
 				serviceRepresentation{
 					Name: "a",
-					Type: "b",
+					ServiceInfo: &runtime.ServiceInfo{
+						Service: &dynamic.Service{
+							LoadBalancer: &dynamic.ServersLoadBalancer{
+								Servers: make([]dynamic.Server, 2),
+							},
+						},
+					},
 				},
 				serviceRepresentation{
 					Name: "b",
-					Type: "b",
+					ServiceInfo: &runtime.ServiceInfo{
+						Service: &dynamic.Service{
+							LoadBalancer: &dynamic.ServersLoadBalancer{
+								Servers: make([]dynamic.Server, 2),
+							},
+						},
+					},
 				},
 			},
 			expected: []orderedService{
 				serviceRepresentation{
 					Name: "b",
-					Type: "b",
+					ServiceInfo: &runtime.ServiceInfo{
+						Service: &dynamic.Service{
+							LoadBalancer: &dynamic.ServersLoadBalancer{
+								Servers: make([]dynamic.Server, 2),
+							},
+						},
+					},
 				},
 				serviceRepresentation{
 					Name: "a",
-					Type: "b",
+					ServiceInfo: &runtime.ServiceInfo{
+						Service: &dynamic.Service{
+							LoadBalancer: &dynamic.ServersLoadBalancer{
+								Servers: make([]dynamic.Server, 2),
+							},
+						},
+					},
 				},
 				serviceRepresentation{
 					Name: "b",
-					Type: "a",
+					ServiceInfo: &runtime.ServiceInfo{
+						Service: &dynamic.Service{
+							LoadBalancer: &dynamic.ServersLoadBalancer{
+								Servers: make([]dynamic.Server, 1),
+							},
+						},
+					},
 				},
 				serviceRepresentation{
 					Name: "a",
-					Type: "a",
+					ServiceInfo: &runtime.ServiceInfo{
+						Service: &dynamic.Service{
+							LoadBalancer: &dynamic.ServersLoadBalancer{
+								Servers: make([]dynamic.Server, 1),
+							},
+						},
+					},
 				},
 			},
 		},
@@ -1263,10 +1311,345 @@ func TestSortServices(t *testing.T) {
 		t.Run(fmt.Sprintf("%s-%s", test.direction, test.sortBy), func(t *testing.T) {
 			t.Parallel()
 
-			url, err := url.Parse(fmt.Sprintf("/?direction=%s&sortBy=%s", test.direction, test.sortBy))
+			u, err := url.Parse(fmt.Sprintf("/?direction=%s&sortBy=%s", test.direction, test.sortBy))
 			require.NoError(t, err)
 
-			sortServices(url.Query(), test.elements)
+			sortServices(u.Query(), test.elements)
+
+			assert.Equal(t, test.expected, test.elements)
+		})
+	}
+}
+
+func TestSortMiddlewares(t *testing.T) {
+	testCases := []struct {
+		direction string
+		sortBy    string
+		elements  []orderedMiddleware
+		expected  []orderedMiddleware
+	}{
+		{
+			direction: ascendantSorting,
+			sortBy:    "name",
+			elements: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "b",
+				},
+				middlewareRepresentation{
+					Name: "a",
+				},
+			},
+			expected: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "a",
+				},
+				middlewareRepresentation{
+					Name: "b",
+				},
+			},
+		},
+		{
+			direction: descendantSorting,
+			sortBy:    "name",
+			elements: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "a",
+				},
+				middlewareRepresentation{
+					Name: "b",
+				},
+			},
+			expected: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "b",
+				},
+				middlewareRepresentation{
+					Name: "a",
+				},
+			},
+		},
+		{
+			direction: ascendantSorting,
+			sortBy:    "type",
+			elements: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "b",
+					Type: "b",
+				},
+				middlewareRepresentation{
+					Name: "a",
+					Type: "b",
+				},
+				middlewareRepresentation{
+					Name: "b",
+					Type: "a",
+				},
+				middlewareRepresentation{
+					Name: "a",
+					Type: "a",
+				},
+			},
+			expected: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "a",
+					Type: "a",
+				},
+				middlewareRepresentation{
+					Name: "b",
+					Type: "a",
+				},
+				middlewareRepresentation{
+					Name: "a",
+					Type: "b",
+				},
+				middlewareRepresentation{
+					Name: "b",
+					Type: "b",
+				},
+			},
+		},
+		{
+			direction: descendantSorting,
+			sortBy:    "type",
+			elements: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "a",
+					Type: "a",
+				},
+				middlewareRepresentation{
+					Name: "b",
+					Type: "a",
+				},
+				middlewareRepresentation{
+					Name: "a",
+					Type: "b",
+				},
+				middlewareRepresentation{
+					Name: "b",
+					Type: "b",
+				},
+			},
+			expected: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "b",
+					Type: "b",
+				},
+				middlewareRepresentation{
+					Name: "a",
+					Type: "b",
+				},
+				middlewareRepresentation{
+					Name: "b",
+					Type: "a",
+				},
+				middlewareRepresentation{
+					Name: "a",
+					Type: "a",
+				},
+			},
+		},
+		{
+			direction: ascendantSorting,
+			sortBy:    "provider",
+			elements: []orderedMiddleware{
+				middlewareRepresentation{
+					Name:     "b",
+					Provider: "b",
+				},
+				middlewareRepresentation{
+					Name:     "b",
+					Provider: "a",
+				},
+				middlewareRepresentation{
+					Name:     "a",
+					Provider: "b",
+				},
+				middlewareRepresentation{
+					Name:     "a",
+					Provider: "a",
+				},
+			},
+			expected: []orderedMiddleware{
+				middlewareRepresentation{
+					Name:     "a",
+					Provider: "a",
+				},
+				middlewareRepresentation{
+					Name:     "b",
+					Provider: "a",
+				},
+				middlewareRepresentation{
+					Name:     "a",
+					Provider: "b",
+				},
+				middlewareRepresentation{
+					Name:     "b",
+					Provider: "b",
+				},
+			},
+		},
+		{
+			direction: descendantSorting,
+			sortBy:    "provider",
+			elements: []orderedMiddleware{
+				middlewareRepresentation{
+					Name:     "a",
+					Provider: "a",
+				},
+				middlewareRepresentation{
+					Name:     "a",
+					Provider: "b",
+				},
+				middlewareRepresentation{
+					Name:     "b",
+					Provider: "a",
+				},
+				middlewareRepresentation{
+					Name:     "b",
+					Provider: "b",
+				},
+			},
+			expected: []orderedMiddleware{
+				middlewareRepresentation{
+					Name:     "b",
+					Provider: "b",
+				},
+				middlewareRepresentation{
+					Name:     "a",
+					Provider: "b",
+				},
+				middlewareRepresentation{
+					Name:     "b",
+					Provider: "a",
+				},
+				middlewareRepresentation{
+					Name:     "a",
+					Provider: "a",
+				},
+			},
+		},
+		{
+			direction: ascendantSorting,
+			sortBy:    "status",
+			elements: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "b",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "b",
+					},
+				},
+				middlewareRepresentation{
+					Name: "a",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "b",
+					},
+				},
+				middlewareRepresentation{
+					Name: "b",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "a",
+					},
+				},
+				middlewareRepresentation{
+					Name: "a",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "a",
+					},
+				},
+			},
+			expected: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "a",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "a",
+					},
+				},
+				middlewareRepresentation{
+					Name: "b",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "a",
+					},
+				},
+				middlewareRepresentation{
+					Name: "a",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "b",
+					},
+				},
+				middlewareRepresentation{
+					Name: "b",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "b",
+					},
+				},
+			},
+		},
+		{
+			direction: descendantSorting,
+			sortBy:    "status",
+			elements: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "a",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "a",
+					},
+				},
+				middlewareRepresentation{
+					Name: "b",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "a",
+					},
+				},
+				middlewareRepresentation{
+					Name: "a",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "b",
+					},
+				},
+				middlewareRepresentation{
+					Name: "b",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "b",
+					},
+				},
+			},
+			expected: []orderedMiddleware{
+				middlewareRepresentation{
+					Name: "b",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "b",
+					},
+				},
+				middlewareRepresentation{
+					Name: "a",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "b",
+					},
+				},
+				middlewareRepresentation{
+					Name: "b",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "a",
+					},
+				},
+				middlewareRepresentation{
+					Name: "a",
+					MiddlewareInfo: &runtime.MiddlewareInfo{
+						Status: "a",
+					},
+				},
+			},
+		},
+	}
+	for _, test := range testCases {
+		test := test
+		t.Run(fmt.Sprintf("%s-%s", test.direction, test.sortBy), func(t *testing.T) {
+			t.Parallel()
+
+			u, err := url.Parse(fmt.Sprintf("/?direction=%s&sortBy=%s", test.direction, test.sortBy))
+			require.NoError(t, err)
+
+			sortMiddlewares(u.Query(), test.elements)
 
 			assert.Equal(t, test.expected, test.elements)
 		})
