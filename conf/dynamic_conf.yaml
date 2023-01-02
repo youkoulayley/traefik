@@ -1,0 +1,13 @@
+http:
+  routers:
+    pouet:
+      rule: "HostRegexp(`{.+}`)"
+      entryPoints:
+        - web
+      service: pouet
+
+  services:
+    pouet:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:8081
