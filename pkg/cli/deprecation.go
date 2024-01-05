@@ -47,7 +47,7 @@ func (c *configuration) deprecationNotice(logger zerolog.Logger) bool {
 	if c.Pilot != nil {
 		incompatible = true
 		logger.Error().Msg("Pilot configuration has been removed in v3, please remove all Marathon-related static configuration for Traefik to start." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#pilot")
 	}
 
 	return incompatible ||
@@ -79,13 +79,13 @@ func (p *providers) deprecationNotice(logger zerolog.Logger) bool {
 	if p.Marathon != nil {
 		incompatible = true
 		logger.Error().Msg("Marathon provider has been removed in v3, please remove all Marathon-related static configuration for Traefik to start." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#marathon-provider")
 	}
 
 	if p.Rancher != nil {
 		incompatible = true
 		logger.Error().Msg("Rancher provider has been removed in v3, please remove all Rancher-related static configuration for Traefik to start." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#rancher-v1-provider")
 	}
 
 	return incompatible ||
@@ -118,11 +118,12 @@ func (d *docker) deprecationNotice(logger zerolog.Logger) bool {
 	if d.SwarmMode != nil {
 		incompatible = true
 		logger.Error().Msg("Docker provider `swarmMode` option has been removed in v3, please use the Swarm Provider instead." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#docker-docker-swarm")
 	}
 
 	if d.TLS != nil && d.TLS.CAOptional != nil {
 		incompatible = true
+		//FIXME
 		logger.Error().Msg("Docker provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
 			"Please remove all occurrences from the static configuration for Traefik to start." +
 			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
@@ -144,9 +145,8 @@ func (s *swarm) deprecationNotice(logger zerolog.Logger) bool {
 
 	if s.TLS != nil && s.TLS.CAOptional != nil {
 		incompatible = true
-		logger.Error().Msg("Swarm provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
-			"Please remove all occurrences from the static configuration for Traefik to start." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+		logger.Error().Msg("Swarm provider `tls.CAOptional` option does not exist, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
+			"Please remove all occurrences from the static configuration for Traefik to start.")
 	}
 
 	return incompatible
@@ -165,6 +165,7 @@ func (e *etcd) deprecationNotice(logger zerolog.Logger) bool {
 
 	if e.TLS != nil && e.TLS.CAOptional != nil {
 		incompatible = true
+		// FIXME
 		logger.Error().Msg("ETCD provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
 			"Please remove all occurrences from the static configuration for Traefik to start." +
 			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
@@ -186,6 +187,7 @@ func (r *redis) deprecationNotice(logger zerolog.Logger) bool {
 
 	if r.TLS != nil && r.TLS.CAOptional != nil {
 		incompatible = true
+		// FIXME
 		logger.Error().Msg("Redis provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
 			"Please remove all occurrences from the static configuration for Traefik to start." +
 			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
@@ -209,11 +211,13 @@ func (c *consul) deprecationNotice(logger zerolog.Logger) bool {
 	if c.Namespace != nil {
 		incompatible = true
 		logger.Error().Msg("Consul provider `namespace` option has been removed, please use the `namespaces` option instead." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#consul-provider")
 	}
 
 	if c.TLS != nil && c.TLS.CAOptional != nil {
 		incompatible = true
+
+		// FIXME
 		logger.Error().Msg("Consul provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
 			"Please remove all occurrences from the static configuration for Traefik to start." +
 			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
@@ -241,11 +245,12 @@ func (c *consulCatalog) deprecationNotice(logger zerolog.Logger) bool {
 	if c.Namespace != nil {
 		incompatible = true
 		logger.Error().Msg("ConsulCatalog provider `namespace` option has been removed, please use the `namespaces` option instead." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#consulcatalog-provider")
 	}
 
 	if c.Endpoint != nil && c.Endpoint.TLS != nil && c.Endpoint.TLS.CAOptional != nil {
 		incompatible = true
+		// FIXME
 		logger.Error().Msg("ConsulCatalog provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
 			"Please remove all occurrences from the static configuration for Traefik to start." +
 			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
@@ -269,11 +274,12 @@ func (n *nomad) deprecationNotice(logger zerolog.Logger) bool {
 	if n.Namespace != nil {
 		incompatible = true
 		logger.Error().Msg("Nomad provider `namespace` option has been removed, please use the `namespaces` option instead." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#nomad-provider")
 	}
 
 	if n.Endpoint != nil && n.Endpoint.TLS != nil && n.Endpoint.TLS.CAOptional != nil {
 		incompatible = true
+		// FIXME
 		logger.Error().Msg("Nomad provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
 			"Please remove all occurrences from the static configuration for Traefik to start." +
 			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
@@ -295,6 +301,7 @@ func (h *http) deprecationNotice(logger zerolog.Logger) bool {
 
 	if h.TLS != nil && h.TLS.CAOptional != nil {
 		incompatible = true
+		// FIXME
 		logger.Error().Msg("HTTP provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
 			"Please remove all occurrences from the static configuration for Traefik to start." +
 			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
@@ -315,7 +322,7 @@ func (e *experimental) deprecationNotice(logger zerolog.Logger) bool {
 	if e.HTTP3 != nil {
 		logger.Warn().Msg("HTTP3 is not an experimental feature in v3 and the associated enablement option will be remove in a future major release." +
 			"This option has now no effect, but we recommend to stop using it to avoid hassle considering future major release upgrade." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#http3-experimental-configuration")
 	}
 
 	// As long as HTTP3 is still a field of the experimental static configuration,
