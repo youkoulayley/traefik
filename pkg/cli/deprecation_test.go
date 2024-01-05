@@ -19,8 +19,8 @@ func TestDeprecationNotice(t *testing.T) {
 			desc: "Docker provider swarmMode option is incompatible",
 			config: map[string]interface{}{
 				"providers": map[string]interface{}{
-					"docker": map[string]string{
-						"swarmMode": "true",
+					"docker": map[string]bool{
+						"swarmMode": true,
 					},
 				},
 			},
@@ -28,7 +28,35 @@ func TestDeprecationNotice(t *testing.T) {
 			incompatible: assert.True,
 		},
 		{
-			desc: "Consul namespace option is incompatible",
+			desc: "Docker provider tls.CAOptional option is incompatible",
+			config: map[string]interface{}{
+				"providers": map[string]interface{}{
+					"docker": map[string]interface{}{
+						"tls": map[string]bool{
+							"caOptional": true,
+						},
+					},
+				},
+			},
+			logLevel:     zerolog.ErrorLevel,
+			incompatible: assert.True,
+		},
+		{
+			desc: "Swarm provider tls.CAOptional option is incompatible",
+			config: map[string]interface{}{
+				"providers": map[string]interface{}{
+					"swarm": map[string]interface{}{
+						"tls": map[string]bool{
+							"caOptional": true,
+						},
+					},
+				},
+			},
+			logLevel:     zerolog.ErrorLevel,
+			incompatible: assert.True,
+		},
+		{
+			desc: "Consul provider namespace option is incompatible",
 			config: map[string]interface{}{
 				"providers": map[string]interface{}{
 					"consul": map[string]string{
@@ -40,7 +68,21 @@ func TestDeprecationNotice(t *testing.T) {
 			incompatible: assert.True,
 		},
 		{
-			desc: "ConsulCatalog namespace option is incompatible",
+			desc: "Consul provider tls.CAOptional option is incompatible",
+			config: map[string]interface{}{
+				"providers": map[string]interface{}{
+					"consul": map[string]interface{}{
+						"tls": map[string]bool{
+							"caOptional": true,
+						},
+					},
+				},
+			},
+			logLevel:     zerolog.ErrorLevel,
+			incompatible: assert.True,
+		},
+		{
+			desc: "ConsulCatalog provider namespace option is incompatible",
 			config: map[string]interface{}{
 				"providers": map[string]interface{}{
 					"consulCatalog": map[string]string{
@@ -52,11 +94,43 @@ func TestDeprecationNotice(t *testing.T) {
 			incompatible: assert.True,
 		},
 		{
-			desc: "Nomad namespace option is incompatible",
+			desc: "ConsulCatalog provider tls.CAOptional option is incompatible",
+			config: map[string]interface{}{
+				"providers": map[string]interface{}{
+					"consulCatalog": map[string]interface{}{
+						"endpoint": map[string]interface{}{
+							"tls": map[string]bool{
+								"caOptional": true,
+							},
+						},
+					},
+				},
+			},
+			logLevel:     zerolog.ErrorLevel,
+			incompatible: assert.True,
+		},
+		{
+			desc: "Nomad provider namespace option is incompatible",
 			config: map[string]interface{}{
 				"providers": map[string]interface{}{
 					"nomad": map[string]string{
 						"namespace": "myNamespace",
+					},
+				},
+			},
+			logLevel:     zerolog.ErrorLevel,
+			incompatible: assert.True,
+		},
+		{
+			desc: "Nomad provider tls.CAOptional option is incompatible",
+			config: map[string]interface{}{
+				"providers": map[string]interface{}{
+					"nomad": map[string]interface{}{
+						"endpoint": map[string]interface{}{
+							"tls": map[string]bool{
+								"caOptional": true,
+							},
+						},
 					},
 				},
 			},
@@ -81,6 +155,48 @@ func TestDeprecationNotice(t *testing.T) {
 				"providers": map[string]interface{}{
 					"rancher": map[string]string{
 						"foo": "bar",
+					},
+				},
+			},
+			logLevel:     zerolog.ErrorLevel,
+			incompatible: assert.True,
+		},
+		{
+			desc: "ETCD provider tls.CAOptional option is incompatible",
+			config: map[string]interface{}{
+				"providers": map[string]interface{}{
+					"etcd": map[string]interface{}{
+						"tls": map[string]bool{
+							"caOptional": true,
+						},
+					},
+				},
+			},
+			logLevel:     zerolog.ErrorLevel,
+			incompatible: assert.True,
+		},
+		{
+			desc: "Redis provider tls.CAOptional option is incompatible",
+			config: map[string]interface{}{
+				"providers": map[string]interface{}{
+					"redis": map[string]interface{}{
+						"tls": map[string]bool{
+							"caOptional": true,
+						},
+					},
+				},
+			},
+			logLevel:     zerolog.ErrorLevel,
+			incompatible: assert.True,
+		},
+		{
+			desc: "HTTP provider tls.CAOptional option is incompatible",
+			config: map[string]interface{}{
+				"providers": map[string]interface{}{
+					"http": map[string]interface{}{
+						"tls": map[string]bool{
+							"caOptional": true,
+						},
 					},
 				},
 			},

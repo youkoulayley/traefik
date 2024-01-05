@@ -57,16 +57,16 @@ func (c *configuration) deprecationNotice(logger zerolog.Logger) bool {
 }
 
 type providers struct {
-	Docker        *docker            `json:"docker,omitempty" toml:"docker,omitempty" yaml:"docker,omitempty"`
-	Consul        *hashicorpProvider `json:"consul,omitempty" toml:"consul,omitempty" yaml:"consul,omitempty"`
-	ConsulCatalog *hashicorpProvider `json:"consulCatalog,omitempty" toml:"consulCatalog,omitempty" yaml:"consulCatalog,omitempty"`
-	Nomad         *hashicorpProvider `json:"nomad,omitempty" toml:"nomad,omitempty" yaml:"nomad,omitempty"`
-	Marathon      *interface{}       `json:"marathon,omitempty" toml:"marathon,omitempty" yaml:"marathon,omitempty"`
-	Rancher       *interface{}       `json:"rancher,omitempty" toml:"rancher,omitempty" yaml:"rancher,omitempty"`
-}
-
-type hashicorpProvider struct {
-	Namespace *string `json:"namespace,omitempty" toml:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Docker        *docker        `json:"docker,omitempty" toml:"docker,omitempty" yaml:"docker,omitempty"`
+	Swarm         *swarm         `json:"swarm,omitempty" toml:"swarm,omitempty" yaml:"swarm,omitempty"`
+	Consul        *consul        `json:"consul,omitempty" toml:"consul,omitempty" yaml:"consul,omitempty"`
+	ConsulCatalog *consulCatalog `json:"consulCatalog,omitempty" toml:"consulCatalog,omitempty" yaml:"consulCatalog,omitempty"`
+	Nomad         *nomad         `json:"nomad,omitempty" toml:"nomad,omitempty" yaml:"nomad,omitempty"`
+	Marathon      *interface{}   `json:"marathon,omitempty" toml:"marathon,omitempty" yaml:"marathon,omitempty"`
+	Rancher       *interface{}   `json:"rancher,omitempty" toml:"rancher,omitempty" yaml:"rancher,omitempty"`
+	ETCD          *etcd          `json:"etcd,omitempty" toml:"etcd,omitempty" yaml:"etcd,omitempty"`
+	Redis         *redis         `json:"redis,omitempty" toml:"redis,omitempty" yaml:"redis,omitempty"`
+	HTTP          *http          `json:"http,omitempty" toml:"http,omitempty" yaml:"http,omitempty"`
 }
 
 func (p *providers) deprecationNotice(logger zerolog.Logger) bool {
@@ -75,23 +75,6 @@ func (p *providers) deprecationNotice(logger zerolog.Logger) bool {
 	}
 
 	var incompatible bool
-	if p.Consul != nil && p.Consul.Namespace != nil {
-		incompatible = true
-		logger.Error().Msg("Consul provider `namespace` option has been removed, please use the `namespaces` option instead." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
-	}
-
-	if p.ConsulCatalog != nil && p.ConsulCatalog.Namespace != nil {
-		incompatible = true
-		logger.Error().Msg("ConsulCatalog provider `namespace` option has been removed, please use the `namespaces` option instead." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
-	}
-
-	if p.Nomad != nil && p.Nomad.Namespace != nil {
-		incompatible = true
-		logger.Error().Msg("ConsulCatalog provider `namespace` option has been removed, please use the `namespaces` option instead." +
-			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
-	}
 
 	if p.Marathon != nil {
 		incompatible = true
@@ -105,11 +88,24 @@ func (p *providers) deprecationNotice(logger zerolog.Logger) bool {
 			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
 	}
 
-	return incompatible || p.Docker.deprecationNotice(logger)
+	return incompatible ||
+		p.Docker.deprecationNotice(logger) ||
+		p.Consul.deprecationNotice(logger) ||
+		p.ConsulCatalog.deprecationNotice(logger) ||
+		p.Nomad.deprecationNotice(logger) ||
+		p.Swarm.deprecationNotice(logger) ||
+		p.ETCD.deprecationNotice(logger) ||
+		p.Redis.deprecationNotice(logger) ||
+		p.HTTP.deprecationNotice(logger)
+}
+
+type tls struct {
+	CAOptional *bool `json:"caOptional,omitempty" toml:"caOptional,omitempty" yaml:"caOptional,omitempty"`
 }
 
 type docker struct {
 	SwarmMode *bool `json:"swarmMode,omitempty" toml:"swarmMode,omitempty" yaml:"swarmMode,omitempty"`
+	TLS       *tls  `json:"tls,omitempty" toml:"tls,omitempty" yaml:"tls,omitempty"`
 }
 
 func (d *docker) deprecationNotice(logger zerolog.Logger) bool {
@@ -122,6 +118,185 @@ func (d *docker) deprecationNotice(logger zerolog.Logger) bool {
 	if d.SwarmMode != nil {
 		incompatible = true
 		logger.Error().Msg("Docker provider `swarmMode` option has been removed in v3, please use the Swarm Provider instead." +
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+	}
+
+	if d.TLS != nil && d.TLS.CAOptional != nil {
+		incompatible = true
+		logger.Error().Msg("Docker provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
+			"Please remove all occurrences from the static configuration for Traefik to start." +
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+	}
+
+	return incompatible
+}
+
+type swarm struct {
+	TLS *tls `json:"tls,omitempty" toml:"tls,omitempty" yaml:"tls,omitempty"`
+}
+
+func (s *swarm) deprecationNotice(logger zerolog.Logger) bool {
+	if s == nil {
+		return false
+	}
+
+	var incompatible bool
+
+	if s.TLS != nil && s.TLS.CAOptional != nil {
+		incompatible = true
+		logger.Error().Msg("Swarm provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
+			"Please remove all occurrences from the static configuration for Traefik to start." +
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+	}
+
+	return incompatible
+}
+
+type etcd struct {
+	TLS *tls `json:"tls,omitempty" toml:"tls,omitempty" yaml:"tls,omitempty"`
+}
+
+func (e *etcd) deprecationNotice(logger zerolog.Logger) bool {
+	if e == nil {
+		return false
+	}
+
+	var incompatible bool
+
+	if e.TLS != nil && e.TLS.CAOptional != nil {
+		incompatible = true
+		logger.Error().Msg("ETCD provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
+			"Please remove all occurrences from the static configuration for Traefik to start." +
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+	}
+
+	return incompatible
+}
+
+type redis struct {
+	TLS *tls `json:"tls,omitempty" toml:"tls,omitempty" yaml:"tls,omitempty"`
+}
+
+func (r *redis) deprecationNotice(logger zerolog.Logger) bool {
+	if r == nil {
+		return false
+	}
+
+	var incompatible bool
+
+	if r.TLS != nil && r.TLS.CAOptional != nil {
+		incompatible = true
+		logger.Error().Msg("Redis provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
+			"Please remove all occurrences from the static configuration for Traefik to start." +
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+	}
+
+	return incompatible
+}
+
+type consul struct {
+	Namespace *string `json:"namespace,omitempty" toml:"namespace,omitempty" yaml:"namespace,omitempty"`
+	TLS       *tls    `json:"tls,omitempty" toml:"tls,omitempty" yaml:"tls,omitempty"`
+}
+
+func (c *consul) deprecationNotice(logger zerolog.Logger) bool {
+	if c == nil {
+		return false
+	}
+
+	var incompatible bool
+
+	if c.Namespace != nil {
+		incompatible = true
+		logger.Error().Msg("Consul provider `namespace` option has been removed, please use the `namespaces` option instead." +
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+	}
+
+	if c.TLS != nil && c.TLS.CAOptional != nil {
+		incompatible = true
+		logger.Error().Msg("Consul provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
+			"Please remove all occurrences from the static configuration for Traefik to start." +
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+	}
+
+	return incompatible
+}
+
+type consulCatalog struct {
+	Namespace *string         `json:"namespace,omitempty" toml:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Endpoint  *endpointConfig `json:"endpoint,omitempty" toml:"endpoint,omitempty" yaml:"endpoint,omitempty" export:"true"`
+}
+
+type endpointConfig struct {
+	TLS *tls `json:"tls,omitempty" toml:"tls,omitempty" yaml:"tls,omitempty"`
+}
+
+func (c *consulCatalog) deprecationNotice(logger zerolog.Logger) bool {
+	if c == nil {
+		return false
+	}
+
+	var incompatible bool
+
+	if c.Namespace != nil {
+		incompatible = true
+		logger.Error().Msg("ConsulCatalog provider `namespace` option has been removed, please use the `namespaces` option instead." +
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+	}
+
+	if c.Endpoint != nil && c.Endpoint.TLS != nil && c.Endpoint.TLS.CAOptional != nil {
+		incompatible = true
+		logger.Error().Msg("ConsulCatalog provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
+			"Please remove all occurrences from the static configuration for Traefik to start." +
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+	}
+
+	return incompatible
+}
+
+type nomad struct {
+	Namespace *string         `json:"namespace,omitempty" toml:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Endpoint  *endpointConfig `json:"endpoint,omitempty" toml:"endpoint,omitempty" yaml:"endpoint,omitempty" export:"true"`
+}
+
+func (n *nomad) deprecationNotice(logger zerolog.Logger) bool {
+	if n == nil {
+		return false
+	}
+
+	var incompatible bool
+
+	if n.Namespace != nil {
+		incompatible = true
+		logger.Error().Msg("Nomad provider `namespace` option has been removed, please use the `namespaces` option instead." +
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+	}
+
+	if n.Endpoint != nil && n.Endpoint.TLS != nil && n.Endpoint.TLS.CAOptional != nil {
+		incompatible = true
+		logger.Error().Msg("Nomad provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
+			"Please remove all occurrences from the static configuration for Traefik to start." +
+			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
+	}
+
+	return incompatible
+}
+
+type http struct {
+	TLS *tls `json:"tls,omitempty" toml:"tls,omitempty" yaml:"tls,omitempty"`
+}
+
+func (h *http) deprecationNotice(logger zerolog.Logger) bool {
+	if h == nil {
+		return false
+	}
+
+	var incompatible bool
+
+	if h.TLS != nil && h.TLS.CAOptional != nil {
+		incompatible = true
+		logger.Error().Msg("HTTP provider `tls.CAOptional` option has been removed in v3, as TLS client authentication is a server side option (see https://github.com/golang/go/blob/740a490f71d026bb7d2d13cb8fa2d6d6e0572b70/src/crypto/tls/common.go#L634)." +
+			"Please remove all occurrences from the static configuration for Traefik to start." +
 			"For more information please read the migration guide: https://doc.traefik.io/traefik/v3.0/migration/v2-to-v3/#")
 	}
 
