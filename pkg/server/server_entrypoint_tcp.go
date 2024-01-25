@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -18,6 +19,7 @@ import (
 	"github.com/containous/alice"
 	"github.com/pires/go-proxyproto"
 	"github.com/sirupsen/logrus"
+	ptypes "github.com/traefik/paerser/types"
 	"github.com/traefik/traefik/v2/pkg/config/static"
 	"github.com/traefik/traefik/v2/pkg/ip"
 	"github.com/traefik/traefik/v2/pkg/log"
@@ -39,6 +41,7 @@ type key string
 
 const (
 	connStateKey       key    = "connState"
+	connKey            key    = "conn"
 	debugConnectionEnv string = "DEBUG_CONNECTION"
 )
 
@@ -247,8 +250,8 @@ func (e *TCPEntryPoint) Start(ctx context.Context) {
 			// Enforce read/write deadlines at the connection level,
 			// because when we're peeking the first byte to determine whether we are doing TLS,
 			// the deadlines at the server level are not taken into account.
-			if e.transportConfiguration.RespondingTimeouts.ReadTimeout > 0 {
-				err := writeCloser.SetReadDeadline(time.Now().Add(time.Duration(e.transportConfiguration.RespondingTimeouts.ReadTimeout)))
+			if e.transportConfiguration.RespondingTimeouts.ReadTimeout != nil && *e.transportConfiguration.RespondingTimeouts.ReadTimeout > 0 {
+				err := writeCloser.SetReadDeadline(time.Now().Add(time.Duration(*e.transportConfiguration.RespondingTimeouts.ReadTimeout)))
 				if err != nil {
 					logger.Errorf("Error while setting read deadline: %v", err)
 				}
@@ -418,10 +421,10 @@ func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
 }
 
 func buildProxyProtocolListener(ctx context.Context, entryPoint *static.EntryPoint, listener net.Listener) (net.Listener, error) {
-	timeout := entryPoint.Transport.RespondingTimeouts.ReadTimeout
-	// proxyproto use 200ms if ReadHeaderTimeout is set to 0 and not no timeout
-	if timeout == 0 {
-		timeout = -1
+	// proxyproto use 200ms if Listener.ReadHeaderTimeout is set to 0 and not no timeout
+	var timeout ptypes.Duration = -1
+	if entryPoint.Transport.RespondingTimeouts.ReadTimeout != nil && *entryPoint.Transport.RespondingTimeouts.ReadTimeout != 0 {
+		timeout = *entryPoint.Transport.RespondingTimeouts.ReadTimeout
 	}
 	proxyListener := &proxyproto.Listener{Listener: listener, ReadHeaderTimeout: time.Duration(timeout)}
 
@@ -584,32 +587,73 @@ func createHTTPServer(ctx context.Context, ln net.Listener, configuration *stati
 		handler = newKeepAliveMiddleware(handler, configuration.Transport.KeepAliveMaxRequests, configuration.Transport.KeepAliveMaxTime)
 	}
 
-	serverHTTP := &http.Server{
-		Handler:      handler,
-		ErrorLog:     httpServerLogger,
-		ReadTimeout:  time.Duration(configuration.Transport.RespondingTimeouts.ReadTimeout),
-		WriteTimeout: time.Duration(configuration.Transport.RespondingTimeouts.WriteTimeout),
-		IdleTimeout:  time.Duration(configuration.Transport.RespondingTimeouts.IdleTimeout),
-	}
-	if debugConnection || (configuration.Transport != nil && (configuration.Transport.KeepAliveMaxTime > 0 || configuration.Transport.KeepAliveMaxRequests > 0)) {
-		serverHTTP.ConnContext = func(ctx context.Context, c net.Conn) context.Context {
-			cState := &connState{Start: time.Now()}
-			if debugConnection {
-				clientConnectionStatesMu.Lock()
-				clientConnectionStates[getConnKey(c)] = cState
-				clientConnectionStatesMu.Unlock()
-			}
-			return context.WithValue(ctx, connStateKey, cState)
-		}
+	var readHeaderTimeout time.Duration
+	wrappedHandler := handler
 
-		if debugConnection {
-			serverHTTP.ConnState = func(c net.Conn, state http.ConnState) {
-				clientConnectionStatesMu.Lock()
-				if clientConnectionStates[getConnKey(c)] != nil {
-					clientConnectionStates[getConnKey(c)].State = state.String()
-				}
-				clientConnectionStatesMu.Unlock()
+	// If the read timeout is undefined, the handler needs to be protected against requests with a Content-Length header
+	// defined but no body to prevent infinite loading on the client side and stacking connection on the server side.
+	if configuration.Transport.RespondingTimeouts.ReadTimeout == nil {
+		wrappedHandler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			if r == nil {
+				log.FromContext(ctx).Errorf("request is nil")
+				return
 			}
+
+			cl := r.Header.Get("Content-Length")
+			if cl != "" {
+				cli, err := strconv.Atoi(cl)
+				if err != nil {
+					log.FromContext(ctx).Errorf("unable to convert content-length")
+					return
+				}
+
+				if cli > 0 {
+					conn, ok := r.Context().Value(connKey).(net.Conn)
+					if !ok {
+						log.FromContext(ctx).Errorf("unable to get conn")
+						return
+					}
+
+					// Set the connection deadline to close the connection quickly if no body is sent.
+					if err = conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
+						log.FromContext(ctx).Errorf("unable to get conn deadline: %s", err)
+						return
+					}
+				}
+			}
+
+			r = r.WithContext(context.WithValue(r.Context(), connKey, nil))
+
+			handler.ServeHTTP(rw, r)
+		})
+
+		// One second should be enough to read headers.
+		readHeaderTimeout = time.Second
+	}
+
+	var readTimeout time.Duration
+	if configuration.Transport.RespondingTimeouts.ReadTimeout != nil {
+		readTimeout = time.Duration(*configuration.Transport.RespondingTimeouts.ReadTimeout)
+	}
+
+	serverHTTP := &http.Server{
+		Handler:           wrappedHandler,
+		ErrorLog:          httpServerLogger,
+		ReadTimeout:       readTimeout,
+		ReadHeaderTimeout: readHeaderTimeout,
+		WriteTimeout:      time.Duration(configuration.Transport.RespondingTimeouts.WriteTimeout),
+		IdleTimeout:       time.Duration(configuration.Transport.RespondingTimeouts.IdleTimeout),
+	}
+
+	serverHTTP.ConnContext = buildConnContext(debugConnection, configuration.Transport)
+
+	if debugConnection {
+		serverHTTP.ConnState = func(c net.Conn, state http.ConnState) {
+			clientConnectionStatesMu.Lock()
+			if clientConnectionStates[getConnKey(c)] != nil {
+				clientConnectionStates[getConnKey(c)].State = state.String()
+			}
+			clientConnectionStatesMu.Unlock()
 		}
 	}
 
@@ -639,6 +683,41 @@ func createHTTPServer(ctx context.Context, ln net.Listener, configuration *stati
 		Forwarder: listener,
 		Switcher:  httpSwitcher,
 	}, nil
+}
+
+func buildConnContext(debugConnection bool, transport *static.EntryPointsTransport) func(ctx context.Context, c net.Conn) context.Context {
+	var connContextFuncs []func(ctx context.Context, c net.Conn) context.Context
+
+	if debugConnection || (transport != nil && (transport.KeepAliveMaxTime > 0 || transport.KeepAliveMaxRequests > 0)) {
+		connContextFuncs = append(connContextFuncs, func(ctx context.Context, c net.Conn) context.Context {
+			cState := &connState{Start: time.Now()}
+			if debugConnection {
+				clientConnectionStatesMu.Lock()
+				clientConnectionStates[getConnKey(c)] = cState
+				clientConnectionStatesMu.Unlock()
+			}
+			return context.WithValue(ctx, connStateKey, cState)
+		})
+	}
+
+	if transport.RespondingTimeouts.ReadTimeout == nil {
+		connContextFuncs = append(connContextFuncs, func(ctx context.Context, c net.Conn) context.Context {
+			return context.WithValue(ctx, connKey, c)
+		})
+	}
+
+	var connContext func(ctx context.Context, c net.Conn) context.Context
+	if len(connContextFuncs) > 0 {
+		connContext = func(ctx context.Context, c net.Conn) context.Context {
+			for _, f := range connContextFuncs {
+				ctx = f(ctx, c)
+			}
+
+			return ctx
+		}
+	}
+
+	return connContext
 }
 
 func getConnKey(conn net.Conn) string {

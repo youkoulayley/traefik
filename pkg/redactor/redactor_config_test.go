@@ -529,7 +529,7 @@ func TestDo_staticConfiguration(t *testing.T) {
 					GraceTimeOut:              ptypes.Duration(111 * time.Second),
 				},
 				RespondingTimeouts: &static.RespondingTimeouts{
-					ReadTimeout:  ptypes.Duration(111 * time.Second),
+					ReadTimeout:  durationPtr(ptypes.Duration(111 * time.Second)),
 					WriteTimeout: ptypes.Duration(111 * time.Second),
 					IdleTimeout:  ptypes.Duration(111 * time.Second),
 				},
@@ -991,6 +991,10 @@ func TestDo_staticConfiguration(t *testing.T) {
 
 	expected := strings.TrimSuffix(string(expectedConfiguration), "\n")
 	assert.Equal(t, expected, cleanJSON)
+}
+
+func durationPtr(value ptypes.Duration) *ptypes.Duration {
+	return &value
 }
 
 func boolPtr(value bool) *bool {

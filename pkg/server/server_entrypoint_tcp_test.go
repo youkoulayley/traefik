@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -69,7 +70,7 @@ func testShutdown(t *testing.T, router *tcprouter.Router) {
 
 	epConfig.LifeCycle.RequestAcceptGraceTimeout = 0
 	epConfig.LifeCycle.GraceTimeOut = ptypes.Duration(5 * time.Second)
-	epConfig.RespondingTimeouts.ReadTimeout = ptypes.Duration(5 * time.Second)
+	epConfig.RespondingTimeouts.ReadTimeout = durationPtr(ptypes.Duration(5 * time.Second))
 	epConfig.RespondingTimeouts.WriteTimeout = ptypes.Duration(5 * time.Second)
 
 	entryPoint, err := NewTCPEntryPoint(context.Background(), &static.EntryPoint{
@@ -157,7 +158,7 @@ func startEntrypoint(entryPoint *TCPEntryPoint, router *tcprouter.Router) (net.C
 func TestReadTimeoutWithoutFirstByte(t *testing.T) {
 	epConfig := &static.EntryPointsTransport{}
 	epConfig.SetDefaults()
-	epConfig.RespondingTimeouts.ReadTimeout = ptypes.Duration(2 * time.Second)
+	epConfig.RespondingTimeouts.ReadTimeout = durationPtr(ptypes.Duration(2 * time.Second))
 
 	entryPoint, err := NewTCPEntryPoint(context.Background(), &static.EntryPoint{
 		Address:          ":0",
@@ -194,7 +195,7 @@ func TestReadTimeoutWithoutFirstByte(t *testing.T) {
 func TestReadTimeoutWithFirstByte(t *testing.T) {
 	epConfig := &static.EntryPointsTransport{}
 	epConfig.SetDefaults()
-	epConfig.RespondingTimeouts.ReadTimeout = ptypes.Duration(2 * time.Second)
+	epConfig.RespondingTimeouts.ReadTimeout = durationPtr(ptypes.Duration(2 * time.Second))
 
 	entryPoint, err := NewTCPEntryPoint(context.Background(), &static.EntryPoint{
 		Address:          ":0",
@@ -228,6 +229,156 @@ func TestReadTimeoutWithFirstByte(t *testing.T) {
 		require.Equal(t, io.EOF, err)
 	case <-time.Tick(5 * time.Second):
 		t.Error("Timeout while read")
+	}
+}
+
+func TestContentLength(t *testing.T) {
+	tests := []struct {
+		desc              string
+		contentLength     string
+		sendBody          bool
+		waitBetweenWrites time.Duration
+		readTimeout       ptypes.Duration
+		wantError         require.ErrorAssertionFunc
+	}{
+		{
+			desc:      "no timeout with no Content-Length",
+			sendBody:  false,
+			wantError: require.NoError,
+		},
+		{
+			desc:        "no timeout with no Content-Length and custom readTimeout",
+			sendBody:    false,
+			readTimeout: ptypes.Duration(1 * time.Second),
+			wantError:   require.NoError,
+		},
+		{
+			desc:              "no timeout with no Content-Length with body",
+			sendBody:          true,
+			waitBetweenWrites: time.Second,
+			wantError:         require.NoError,
+		},
+		{
+			desc:              "no timeout with no Content-Length with body and custom readTimeout",
+			sendBody:          true,
+			waitBetweenWrites: time.Second,
+			readTimeout:       ptypes.Duration(time.Second),
+			wantError:         require.NoError,
+		},
+		{
+			desc:              "no timeout with Content-Length=0 with body",
+			sendBody:          true,
+			waitBetweenWrites: time.Second,
+			wantError:         require.NoError,
+		},
+		{
+			desc:              "no timeout with Content-Length=0 with body and custom readTimeout",
+			sendBody:          true,
+			waitBetweenWrites: time.Second,
+			readTimeout:       ptypes.Duration(2 * time.Second),
+			wantError:         require.NoError,
+		},
+		{
+			desc:          "timeout with Content-Length without body",
+			contentLength: "Content-Length: 4096",
+			sendBody:      false,
+			wantError:     require.Error,
+		},
+		{
+			desc:          "timeout with Content-Length without body and custom readTimeout",
+			contentLength: "Content-Length: 4096",
+			sendBody:      false,
+			readTimeout:   ptypes.Duration(3 * time.Second),
+			wantError:     require.Error,
+		},
+		{
+			desc:              "timeout with Content-Length with body",
+			contentLength:     "Content-Length: 4096",
+			sendBody:          true,
+			waitBetweenWrites: 3 * time.Second,
+			wantError:         require.Error,
+		},
+		{
+			desc:              "no timeout with Content-Length with body and custom readTimeout",
+			contentLength:     "Content-Length: 4096",
+			sendBody:          true,
+			readTimeout:       ptypes.Duration(3 * time.Second),
+			waitBetweenWrites: 2 * time.Second,
+			wantError:         require.NoError,
+		},
+		{
+			desc:              "timeout with Content-Length with body and custom readTimeout",
+			contentLength:     "Content-Length: 4096",
+			sendBody:          true,
+			readTimeout:       ptypes.Duration(3 * time.Second),
+			waitBetweenWrites: 5 * time.Second,
+			wantError:         require.Error,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			t.Parallel()
+
+			epConfig := &static.EntryPointsTransport{}
+			epConfig.SetDefaults()
+			if test.readTimeout != 0 {
+				epConfig.RespondingTimeouts.ReadTimeout = durationPtr(test.readTimeout)
+			}
+			epConfig.RespondingTimeouts.WriteTimeout = test.readTimeout
+
+			entryPoint, err := NewTCPEntryPoint(context.Background(), &static.EntryPoint{
+				Address:          ":0",
+				Transport:        epConfig,
+				ForwardedHeaders: &static.ForwardedHeaders{},
+				HTTP2:            &static.HTTP2Config{},
+			}, nil)
+			require.NoError(t, err)
+
+			router := &tcprouter.Router{}
+			router.SetHTTPHandler(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+				if test.sendBody {
+					_, err = io.ReadAll(req.Body)
+					test.wantError(t, err)
+				}
+
+				rw.WriteHeader(http.StatusOK)
+			}))
+
+			conn, err := startEntrypoint(entryPoint, router)
+			require.NoError(t, err)
+
+			request := "GET /whoami HTTP/1.1\r\n" +
+				"Host: 127.0.0.1\r\n" +
+				test.contentLength + "\r\n" +
+				"\r\n"
+
+			_, err = conn.Write([]byte(request))
+			require.NoError(t, err)
+
+			if !test.sendBody {
+				b := make([]byte, 2048)
+				_, err = conn.Read(b)
+				test.wantError(t, err)
+				return
+			}
+
+			b := make([]byte, 2048)
+			_, err = conn.Write(b)
+			require.NoError(t, err)
+
+			time.Sleep(test.waitBetweenWrites)
+
+			b = make([]byte, 2048)
+			_, err = conn.Write(b)
+			require.NoError(t, err)
+
+			b = make([]byte, 6192)
+			_, err = conn.Read(b)
+			fmt.Println(string(b))
+			test.wantError(t, err)
+		})
 	}
 }
 
@@ -317,4 +468,8 @@ func TestKeepAliveMaxTime(t *testing.T) {
 	require.True(t, resp.Close)
 	err = resp.Body.Close()
 	require.NoError(t, err)
+}
+
+func durationPtr(dur ptypes.Duration) *ptypes.Duration {
+	return &dur
 }

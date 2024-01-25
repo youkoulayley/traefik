@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/traefik/paerser/types"
 	"github.com/traefik/traefik/v2/pkg/config/static"
 	tcprouter "github.com/traefik/traefik/v2/pkg/server/router/tcp"
 	traefiktls "github.com/traefik/traefik/v2/pkg/tls"
@@ -84,6 +85,7 @@ func TestHTTP3AdvertisedPort(t *testing.T) {
 
 	epConfig := &static.EntryPointsTransport{}
 	epConfig.SetDefaults()
+	epConfig.RespondingTimeouts.ReadTimeout = durationPtr(types.Duration(3 * time.Second))
 
 	entryPoint, err := NewTCPEntryPoint(context.Background(), &static.EntryPoint{
 		Address:          "127.0.0.1:8090",
